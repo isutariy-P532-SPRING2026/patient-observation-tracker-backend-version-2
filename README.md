@@ -1,10 +1,16 @@
-# Patient Observation Tracker — Backend
+# Patient Observation Tracker — Backend (Version 2)
 
-[![CI](https://github.com/isutariy-P532-SPRING2026/patient-observation-tracker-backend/actions/workflows/ci.yml/badge.svg)](https://github.com/isutariy-P532-SPRING2026/patient-observation-tracker-backend/actions/workflows/ci.yml)
+[![CI](https://github.com/isutariy-P532-SPRING2026/patient-observation-tracker-backend-version-2/actions/workflows/ci.yml/badge.svg)](https://github.com/isutariy-P532-SPRING2026/patient-observation-tracker-backend-version-2/actions/workflows/ci.yml)
 
-**Live URL:** https://patient-observation-tracker-backend-cad5.onrender.com
+**Live URL:** <https://isutariy-p532-spring2026.github.io/patient-observation-tracker-frontend-version-2/>
 
-Spring Boot REST API for the Patient Observation Tracker system. Provides endpoints for managing patients, observations, diagnostic rules, protocols, phenomenon types, and audit/command logs using a strict four-layer architecture and four design patterns.
+**Backend API:** <https://patient-observation-tracker-backend-hg23.onrender.com>
+
+**Backend repo :** <https://github.com/isutariy-P532-SPRING2026/patient-observation-tracker-backend-version-2>
+
+**Frontend repo :** <https://github.com/isutariy-P532-SPRING2026/patient-observation-tracker-frontend-version-2>
+
+Spring Boot REST API for the Patient Observation Tracker system. Provides endpoints for managing patients, observations, diagnostic rules, protocols, phenomenon types, and audit/command logs using a strict four-layer architecture and six design patterns.
 
 ---
 
@@ -33,10 +39,7 @@ Open [http://localhost:8080](http://localhost:8080) — the frontend is served f
 ## Run Locally (without Docker)
 
 ```bash
-# Create the data directory
 mkdir data
-
-# Run the app
 mvn spring-boot:run
 ```
 
@@ -44,35 +47,55 @@ mvn spring-boot:run
 
 ## API Endpoints
 
+### Patients & Observations
+
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/api/patients` | List all patients |
 | POST | `/api/patients` | Create patient |
-| GET | `/api/patients/{id}/observations` | List observations |
-| POST | `/api/observations/measurement` | Record measurement |
-| POST | `/api/observations/category` | Record category observation |
-| POST | `/api/observations/{id}/reject` | Reject observation |
-| POST | `/api/patients/{id}/evaluate` | Run diagnostic rules |
-| GET | `/api/phenomenon-types` | List phenomenon types |
-| POST | `/api/phenomenon-types` | Create phenomenon type |
-| GET | `/api/phenomenon-types/{id}/phenomena` | List phenomena for a type |
-| POST | `/api/phenomenon-types/{id}/phenomena` | Add phenomenon to a type |
-| GET | `/api/protocols` | List protocols |
-| POST | `/api/protocols` | Create protocol |
-| GET | `/api/rules` | List associative functions (rules) |
+| GET | `/api/patients/{id}/observations` | List observations for a patient |
+| POST | `/api/observations/measurement` | Record a measurement observation |
+| POST | `/api/observations/category` | Record a category observation |
+| POST | `/api/observations/{id}/reject` | Reject an active observation |
+| POST | `/api/patients/{id}/evaluate` | Run all active diagnostic rules |
+
+### Catalogue
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/phenomenon-types` | List all phenomenon types |
+| POST | `/api/phenomenon-types` | Create a phenomenon type (quantitative or qualitative) |
+| GET | `/api/phenomenon-types/{id}/phenomena` | List phenomena for a qualitative type |
+| POST | `/api/phenomenon-types/{id}/phenomena` | Add a phenomenon to a qualitative type |
+| GET | `/api/protocols` | List all protocols |
+| POST | `/api/protocols` | Create a protocol |
+| GET | `/api/rules` | List all associative functions (diagnostic rules) |
 | POST | `/api/rules` | Create a diagnostic rule |
-| GET | `/api/command-log` | View command log |
-| GET | `/api/audit-log` | View audit log |
+
+### Logs & Undo
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/command-log` | View full command log |
+| POST | `/api/command-log/{id}/undo` | Undo a recorded command |
+| GET | `/api/audit-log` | View full audit log |
+
+### Users
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/users` | List all users |
+| POST | `/api/users` | Create a user |
 
 ---
 
 ## Architecture — Four Layers
 
-```
-Client (@RestController)  →  HTTP only, zero business logic
-Manager (@Service)         →  Orchestrates use-case sequences
-Engine (@Service)          →  Encapsulates a replaceable algorithm
-ResourceAccess (@Repository) →  Atomic data operations
+``` .
+Client (@RestController)       →  HTTP only, zero business logic
+Manager (@Service)             →  Orchestrates use-case sequences
+Engine (@Service)              →  Encapsulates a replaceable algorithm
+ResourceAccess (@Repository)   →  Atomic data operations
 ```
 
 Controllers never instantiate domain objects directly. All `Observation` subtypes are created through `ObservationFactory`.
@@ -81,37 +104,89 @@ Controllers never instantiate domain objects directly. All `Observation` subtype
 
 ## Design Patterns
 
-**Factory (`ObservationFactory`):**
-All `Measurement` and `CategoryObservation` objects are constructed exclusively through `ObservationFactory`, which validates that the phenomenon type's kind (QUANTITATIVE/QUALITATIVE) matches the observation kind and that the unit belongs to the allowed set — before any object is created. Lives in `com.tracker.factory`.
+### Factory — `ObservationFactory`
 
-**Strategy (`DiagnosisEngine` + `SimpleConjunctiveStrategy`):**
-The rule-evaluation algorithm is injected into `DiagnosisEngine` as a `DiagnosisStrategy` interface. `SimpleConjunctiveStrategy` fires a rule only when all argument observation concepts are present in a patient's active observations. A new strategy (e.g. `WeightedScoringStrategy`) can be swapped in for Week 2 without modifying the engine. Lives in `com.tracker.strategy` and `com.tracker.engine`.
+Constructs `Measurement` and `CategoryObservation` objects exclusively through a factory that validates: the phenomenon type's kind (QUANTITATIVE/QUALITATIVE) matches the observation kind, and the unit belongs to the type's allowed set — before any object is created.
 
-**Observer (Spring `ApplicationEventPublisher`):**
-`ObservationManager` publishes an `ObservationEvent` via Spring's event bus whenever an observation is created or rejected. Two listeners handle side-effects independently: `AuditLogListener` appends an audit entry, and `RuleEvaluationListener` re-evaluates all active diagnostic rules. Adding more listeners in Week 2 requires zero changes to existing code. Lives in `com.tracker.event`.
+### Strategy — `DiagnosisEngine` + `DiagnosisStrategyFactory`
 
-**Command (`BaseCommand` + `CommandLog`):**
-Every state-changing action (create patient, record observation, reject observation) is wrapped in a `BaseCommand` carrying an `execute()` method and a JSON payload snapshot. `CommandLog.record()` executes the command then immediately persists a `CommandLogEntry` (with user `"staff"` and timestamp) to the database. Lives in `com.tracker.command`.
+The rule-evaluation algorithm is injected as a `DiagnosisStrategy` interface. `DiagnosisStrategyFactory` selects the strategy at runtime based on the rule's `strategyHint`:
+
+- **`SimpleConjunctiveStrategy`** — fires when all argument observation types are present in a patient's active observations (Week 1).
+- **`WeightedScoringStrategy`** *(Week 2)* — fires when the weighted sum of present argument types meets or exceeds the rule's configurable `threshold`. Each argument type carries an individual `ArgumentWeight`.
+
+### Observer — Spring `ApplicationEventPublisher`
+
+`ObservationManager` publishes an `ObservationEvent` via Spring's event bus on every create or reject. Independent listeners handle side-effects with zero coupling to the manager:
+
+- **`AuditLogListener`** — appends an audit log entry.
+- **`RuleEvaluationListener`** — re-evaluates all active diagnostic rules.
+- **`PropagationListener`** *(Week 2)* — propagates category observations up (ancestors) when PRESENT and down (descendants) when ABSENT, maintaining consistency in the Pain Level concept hierarchy.
+
+### Command — `BaseCommand` + `CommandLog`
+
+Every state-changing action is wrapped in a `BaseCommand` with a lazy `Supplier<String>` payload evaluated **after** `save()` completes (so the entity id is populated before serialization). `CommandLog.record()` executes the command and immediately persists a `CommandLogEntry` with the resolved payload, user, and timestamp.
+
+### Decorator — Observation Processing Pipeline *(Week 2)*
+
+Before an observation is saved, it passes through a chain of `ObservationProcessor` decorators:
+
+1. **`UnitValidationDecorator`** — rejects units not in the phenomenon type's allowed set.
+2. **`AnomalyFlaggingDecorator`** — sets `anomalyFlag = true` when a measurement falls outside `normalMin`/`normalMax`.
+3. **`AuditStampingDecorator`** — stamps `recordingTime` if not already set.
+4. **`BaseObservationProcessor`** — terminal processor; returns the observation unchanged.
+
+New processing steps can be added without modifying existing decorators.
+
+### Undo — `UndoService` *(Week 2)*
+
+`POST /api/command-log/{id}/undo` delegates to `UndoService`, which reads the stored command payload, looks up the affected observation, reverts its status (ACTIVE ↔ REJECTED), and writes an undo entry to the audit log. The command log entry is marked `undone = true`.
+
+---
+
+## Week 2 Changes
+
+| Area | Change |
+|------|--------|
+| **Undo** | `UndoService` + `UndoController` — reverts any recorded command and writes audit trail |
+| **Weighted strategy** | `WeightedScoringStrategy` + `ArgumentWeight` entity — threshold-based rule firing with per-argument weights |
+| **Decorator pipeline** | `UnitValidationDecorator`, `AnomalyFlaggingDecorator`, `AuditStampingDecorator` wrap `BaseObservationProcessor` |
+| **Hierarchy propagation** | `PropagationListener` — PRESENT/ABSENT propagates through `Phenomenon.parentConcept` self-reference |
+| **Anomaly detection** | `PhenomenonType.normalMin` / `normalMax` — `AnomalyFlaggingDecorator` sets `anomalyFlag` on out-of-range measurements |
+| **Multi-user** | `AppUser` entity with `UserRole` (ADMIN/CLINICIAN); `UserInterceptor` reads `X-Username` header into `CurrentUser` request-scoped bean |
+| **Undo audit log** | `UndoService` directly writes `AuditLogEntry` on every undo operation |
+| **Lazy payload fix** | `BaseCommand` uses `Supplier<String> payloadFn` evaluated post-save so entity id is non-null in stored JSON |
+| **Per-name rule seeding** | `DataInitializer.seedRules()` uses per-name guards so new rules are seeded on any restart without duplicating existing ones |
+| **Pain Level hierarchy** | `seedPainLevelIfMissing()` re-seeds Pain Level phenomena if the type exists but has no phenomena in the DB |
 
 ---
 
 ## Project Structure
 
-```
-src/main/java/com/tracker/
-├── config/          AppConfig, DataInitializer
-├── domain/          JPA entities + enums
+``` .
+src/main/java/com/patienttracker/
+├── config/          AppConfig, DataInitializer, CurrentUser, UserInterceptor
+├── domain/          JPA entities (Observation, Measurement, CategoryObservation,
+│                    PhenomenonType, Phenomenon, Protocol, AssociativeFunction,
+│                    ArgumentWeight, CommandLogEntry, AuditLogEntry, AppUser) + enums
 ├── resourceaccess/  Spring Data repositories
 ├── factory/         ObservationFactory
-├── strategy/        DiagnosisStrategy, SimpleConjunctiveStrategy
+├── decorator/       ObservationProcessor, ObservationProcessorDecorator,
+│                    BaseObservationProcessor, UnitValidationDecorator,
+│                    AnomalyFlaggingDecorator, AuditStampingDecorator
+├── strategy/        DiagnosisStrategy, SimpleConjunctiveStrategy,
+│                    WeightedScoringStrategy, DiagnosisStrategyFactory
 ├── command/         Command, BaseCommand, CommandLog
-├── event/           ObservationEvent, AuditLogListener, RuleEvaluationListener
+├── event/           ObservationEvent, AuditLogListener,
+│                    RuleEvaluationListener, PropagationListener
 ├── engine/          DiagnosisEngine
-├── manager/         PatientManager, ObservationManager, CatalogueManager, LogManager
-└── controller/      PatientController, ObservationController, CatalogueController, LogController
+├── manager/         PatientManager, ObservationManager,
+│                    CatalogueManager, LogManager, UndoService
+└── controller/      PatientController, ObservationController,
+                     CatalogueController, LogController, UndoController, UserController
 
-src/main/resources/static/   Frontend HTML pages
-src/test/java/com/tracker/   Unit tests (≥15, no @SpringBootTest)
+src/main/resources/static/   Frontend HTML pages (index, patient, catalogue, logs)
+src/test/java/com/patienttracker/   Unit tests
 ```
 
 ---
@@ -122,7 +197,7 @@ src/test/java/com/tracker/   Unit tests (≥15, no @SpringBootTest)
 mvn test
 ```
 
-Unit tests cover: `ObservationFactory` validation, `SimpleConjunctiveStrategy` logic, `BaseCommand` execution, `CommandLog` persistence, and `AuditLogListener` event handling. All tests use `@ExtendWith(MockitoExtension.class)` — no `@SpringBootTest`.
+Unit tests cover: `ObservationFactory` validation, `SimpleConjunctiveStrategy` and `WeightedScoringStrategy` logic, `BaseCommand` execution, `CommandLog` persistence, and `AuditLogListener` event handling. All tests use `@ExtendWith(MockitoExtension.class)` — no `@SpringBootTest`.
 
 ---
 
@@ -146,8 +221,32 @@ GitHub Actions (`.github/workflows/ci.yml`) runs three jobs:
 
 ## Seed Data
 
-On first startup, `DataInitializer` auto-seeds the database with:
-- **9 quantitative** phenomenon types (Body Temperature, Blood Glucose, Systolic/Diastolic BP, Heart Rate, Body Weight, Body Height, Oxygen Saturation, Respiratory Rate)
-- **5 qualitative** phenomenon types with phenomena (Blood Group, Structural Condition, Pain Level, Level of Consciousness, Mobility Status)
-- **10 protocols** (Standard BP, Fasting Glucose, Oral Temperature, Pulse Oximetry, etc.)
-- **3 diagnostic rules** (Systemic Inflammatory Response, Metabolic Risk, Respiratory Compromise)
+On startup, `DataInitializer` seeds the database (count-guarded for types/protocols/users; name-guarded for rules and Pain Level phenomena):
+
+**Quantitative phenomenon types** (9) with normal ranges and allowed units:
+
+- Body Temperature (36.1–37.2 °C), Blood Glucose (70–140 mg/dL), Systolic BP (90–120 mmHg), Diastolic BP (60–80 mmHg), Heart Rate (60–100 bpm), Oxygen Saturation (95–100 %), Respiratory Rate (12–20 breaths/min), Body Weight, Body Height
+
+**Qualitative phenomenon types** (5) with phenomena:
+
+- Blood Group (A+/A−/B+/B−/AB+/AB−/O+/O−)
+- Structural Condition (Excellent/Good/Fair/Poor/Critical)
+- Pain Level (hierarchy: None; Any Pain → Mild, Moderate, Severe Pain → Extreme)
+- Level of Consciousness (Alert/Verbal/Pain/Unresponsive)
+- Mobility Status (Independent/Assisted/Dependent/Bedbound)
+
+**Protocols** (10): Standard BP, Fasting Glucose, Oral Temperature, Pulse Oximetry, Manual Heart Rate, Random Glucose, Body Weight, Tympanic Temperature, Visual Pain Assessment, Standard Observation
+
+**Diagnostic rules** (3):
+
+- *Systemic Inflammatory Response* — CONJUNCTIVE: Body Temperature + Heart Rate → Systolic BP
+- *Metabolic Risk* — WEIGHTED threshold 1.0: Blood Glucose (w=0.7) + Body Weight (w=0.5) → Systolic BP
+- *Respiratory Compromise* — CONJUNCTIVE: Oxygen Saturation + Heart Rate → Body Temperature
+
+**Users** (4): admin (ADMIN), alice (CLINICIAN), bob (CLINICIAN), staff (CLINICIAN)
+
+---
+
+## Related Repository
+
+Frontend (GitHub Pages): [isutariy-P532-SPRING2026/patient-observation-tracker-frontend-version-2](https://github.com/isutariy-P532-SPRING2026/patient-observation-tracker-frontend-version-2)

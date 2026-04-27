@@ -7,6 +7,8 @@ import lombok.Setter;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "associative_functions")
@@ -34,4 +36,13 @@ public class AssociativeFunction {
     private PhenomenonType productConcept;
 
     private boolean active = true;
+
+    /** "CONJUNCTIVE" (default) or "WEIGHTED" */
+    private String strategyHint = "CONJUNCTIVE";
+
+    /** Threshold score for WEIGHTED strategy */
+    private Double threshold = 1.0;
+
+    @OneToMany(mappedBy = "rule", cascade = CascadeType.ALL, fetch = FetchType.EAGER, orphanRemoval = true)
+    private List<ArgumentWeight> argumentWeights = new ArrayList<>();
 }

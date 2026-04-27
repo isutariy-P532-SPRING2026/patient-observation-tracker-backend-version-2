@@ -3,12 +3,19 @@ package com.patienttracker.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.time.Clock;
 
 @Configuration
 public class AppConfig {
+
+    private final UserInterceptor userInterceptor;
+
+    public AppConfig(UserInterceptor userInterceptor) {
+        this.userInterceptor = userInterceptor;
+    }
 
     // Inject Clock so tests can swap it for a fixed clock
     @Bean
@@ -23,6 +30,16 @@ public class AppConfig {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
                 registry.addMapping("/api/**").allowedOrigins("*").allowedMethods("*");
+            }
+        };
+    }
+
+    @Bean
+    public WebMvcConfigurer userInterceptorConfigurer() {
+        return new WebMvcConfigurer() {
+            @Override
+            public void addInterceptors(InterceptorRegistry registry) {
+                registry.addInterceptor(userInterceptor).addPathPatterns("/api/**");
             }
         };
     }

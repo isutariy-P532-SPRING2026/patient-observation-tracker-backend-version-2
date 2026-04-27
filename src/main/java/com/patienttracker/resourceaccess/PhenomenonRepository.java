@@ -9,4 +9,5 @@ import java.util.List;
 @Repository
 public interface PhenomenonRepository extends JpaRepository<Phenomenon, Long> {
     List<Phenomenon> findByPhenomenonTypeId(Long phenomenonTypeId);
+    List<Phenomenon> findByParentConceptId(Long parentConceptId);
 }

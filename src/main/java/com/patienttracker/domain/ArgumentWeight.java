@@ -1,28 +1,28 @@
 package com.patienttracker.domain;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "phenomena")
+@Table(name = "argument_weights")
 @Getter @Setter @NoArgsConstructor
-@JsonIgnoreProperties({"parentConcept"})
-public class Phenomenon {
+public class ArgumentWeight {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String name;
+    @JsonIgnore  // break circular ref: AssociativeFunction → ArgumentWeight → AssociativeFunction
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "rule_id")
+    private AssociativeFunction rule;
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "phenomenon_type_id")
     private PhenomenonType phenomenonType;
 
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "parent_concept_id")
-    private Phenomenon parentConcept;
+    private Double weight = 1.0;
 }

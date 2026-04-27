@@ -2,6 +2,7 @@ package com.patienttracker.domain;
 
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.patienttracker.domain.enums.ObservationSource;
 import com.patienttracker.domain.enums.ObservationStatus;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -42,4 +43,9 @@ public abstract class Observation {
     private ObservationStatus status = ObservationStatus.ACTIVE;
 
     private String rejectionReason;
+
+    @Enumerated(EnumType.STRING)
+    private ObservationSource source = ObservationSource.MANUAL;
+
+    private boolean anomalyFlag = false;
 }

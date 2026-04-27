@@ -24,6 +24,10 @@ public class PhenomenonType {
     @Enumerated(EnumType.STRING)
     private MeasurementKind kind;
 
+    // For QUANTITATIVE types — normal range for anomaly detection
+    private Double normalMin;
+    private Double normalMax;
+
     // For QUANTITATIVE types — allowed measurement units (e.g. "kg", "mmHg")
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "allowed_units", joinColumns = @JoinColumn(name = "phenomenon_type_id"))

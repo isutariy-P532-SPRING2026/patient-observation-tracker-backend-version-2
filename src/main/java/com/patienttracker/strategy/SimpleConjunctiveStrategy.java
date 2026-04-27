@@ -2,6 +2,7 @@ package com.patienttracker.strategy;
 
 import com.patienttracker.domain.*;
 import com.patienttracker.domain.enums.ObservationStatus;
+import com.patienttracker.domain.enums.ObservationSource;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -19,7 +20,8 @@ public class SimpleConjunctiveStrategy implements DiagnosisStrategy {
     public boolean evaluate(AssociativeFunction rule, List<Observation> patientObservations) {
         // Collect phenomenon-type IDs present in ACTIVE observations
         Set<Long> activeTypeIds = patientObservations.stream()
-            .filter(o -> o.getStatus() == ObservationStatus.ACTIVE)
+            .filter(o -> o.getStatus() == ObservationStatus.ACTIVE
+                    && o.getSource() == ObservationSource.MANUAL)
             .map(o -> {
                 if (o instanceof Measurement m) return m.getPhenomenonType().getId();
                 if (o instanceof CategoryObservation c) return c.getPhenomenon().getPhenomenonType().getId();

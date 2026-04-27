@@ -1,5 +1,6 @@
 package com.patienttracker.manager;
 
+import com.patienttracker.decorator.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.patienttracker.command.BaseCommand;
 import com.patienttracker.command.CommandLog;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.time.Clock;
 
 @Service
 public class ObservationManager {
@@ -30,6 +32,8 @@ public class ObservationManager {
     private final ApplicationEventPublisher eventPublisher;
     private final CommandLog commandLog;
     private final ObjectMapper objectMapper;
+    private final BaseObservationProcessor baseProcessor;
+    private final Clock clock;
 
     public ObservationManager(ObservationRepository observationRepository,
                                PatientRepository patientRepository,
@@ -41,7 +45,9 @@ public class ObservationManager {
                                DiagnosisEngine diagnosisEngine,
                                ApplicationEventPublisher eventPublisher,
                                CommandLog commandLog,
-                               ObjectMapper objectMapper) {
+                               ObjectMapper objectMapper,
+                               BaseObservationProcessor baseProcessor,
+                               Clock clock) {
         this.observationRepository = observationRepository;
         this.patientRepository = patientRepository;
         this.phenomenonTypeRepository = phenomenonTypeRepository;
@@ -53,6 +59,8 @@ public class ObservationManager {
         this.eventPublisher = eventPublisher;
         this.commandLog = commandLog;
         this.objectMapper = objectMapper;
+        this.baseProcessor = baseProcessor;
+        this.clock = clock;
     }
 
     public Observation recordMeasurement(Long patientId, Long phenomenonTypeId,
@@ -64,12 +72,15 @@ public class ObservationManager {
             ? protocolRepository.findById(protocolId).orElse(null) : null;
 
         Measurement m = factory.createMeasurement(patient, pt, amount, unit, applicabilityTime, protocol);
+        buildPipeline().process(m);
 
         Observation[] result = {null};
+        // Use Supplier<String> so payload is serialized AFTER save (id is assigned by then)
         commandLog.record(new BaseCommand(
             "RECORD_MEASUREMENT",
-            toJson(m),
-            () -> result[0] = observationRepository.save(m)
+            () -> toJson(result[0]),
+            () -> result[0] = observationRepository.save(m),
+            () -> {}
         ));
         eventPublisher.publishEvent(new ObservationEvent(result[0], "CREATED"));
         return result[0];
@@ -85,12 +96,15 @@ public class ObservationManager {
 
         CategoryObservation co = factory.createCategoryObservation(
             patient, phenomenon, presence, applicabilityTime, protocol);
+        buildPipeline().process(co);
 
         Observation[] result = {null};
+        // Use Supplier<String> so payload is serialized AFTER save (id is assigned by then)
         commandLog.record(new BaseCommand(
             "RECORD_CATEGORY_OBSERVATION",
-            toJson(co),
-            () -> result[0] = observationRepository.save(co)
+            () -> toJson(result[0]),
+            () -> result[0] = observationRepository.save(co),
+            () -> {}
         ));
         eventPublisher.publishEvent(new ObservationEvent(result[0], "CREATED"));
         return result[0];
@@ -126,5 +140,13 @@ public class ObservationManager {
     private String toJson(Object obj) {
         try { return objectMapper.writeValueAsString(obj); }
         catch (Exception e) { return "{}"; }
+    }
+
+    private ObservationProcessor buildPipeline() {
+        return new AuditStampingDecorator(
+                new AnomalyFlaggingDecorator(
+                    new UnitValidationDecorator(
+                        baseProcessor)),
+                clock);
     }
 }

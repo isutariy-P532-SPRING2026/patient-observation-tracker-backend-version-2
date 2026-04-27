@@ -19,8 +19,10 @@ public class CommandLogEntry {
     private String commandType;
 
     @Column(columnDefinition = "TEXT")
-    private String payload;   
+    private String payload;
 
     private LocalDateTime executedAt;
-    private String user;
+    private String user;         
+    private Long userId;         
+    private boolean undone = false;   
 }
