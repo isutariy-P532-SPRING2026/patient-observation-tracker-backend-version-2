@@ -35,9 +35,9 @@ public class DataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        if (userRepo.count() == 0)     seedUsers();
         if (ptRepo.count() == 0)       seedPhenomenonTypes();
         if (protocolRepo.count() == 0) seedProtocols();
+        seedUsers();               // per-username check inside — safe to call on every startup
         seedRules();               // per-rule name check inside — safe to call on every startup
         seedPainLevelIfMissing();  // re-seeds Pain Level phenomena if the type exists but is empty
     }
@@ -45,17 +45,19 @@ public class DataInitializer implements CommandLineRunner {
     // ---- Users ----
 
     private void seedUsers() {
-        createUser("admin",   UserRole.ADMIN);
-        createUser("alice",   UserRole.CLINICIAN);
-        createUser("bob",     UserRole.CLINICIAN);
-        createUser("staff",   UserRole.CLINICIAN);  // backwards-compat default
+        ensureUser("admin", UserRole.ADMIN);
+        ensureUser("alice", UserRole.CLINICIAN);
+        ensureUser("bob",   UserRole.CLINICIAN);
+        ensureUser("staff", UserRole.CLINICIAN);
     }
 
-    private void createUser(String username, UserRole role) {
-        AppUser u = new AppUser();
-        u.setUsername(username);
-        u.setRole(role);
-        userRepo.save(u);
+    private void ensureUser(String username, UserRole role) {
+        if (userRepo.findByUsername(username).isEmpty()) {
+            AppUser u = new AppUser();
+            u.setUsername(username);
+            u.setRole(role);
+            userRepo.save(u);
+        }
     }
 
     // ---- Phenomenon Types ----
